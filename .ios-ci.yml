@@ -1,0 +1,16 @@
+# ios-ci-workflows 的 App 配置
+
+workdir: .
+project: NovelReader.xcodeproj
+scheme: NovelReader
+bundle_id: com.daiwenheng.novelreader
+display_name: 小说阅读器
+generate_command: xcodegen generate
+
+toolchain:
+  xcode: '26.6'
+  simulator: iPhone 17 Pro
+  ios: '26.4'
+
+build_test:
+  commit_recorded_snapshots: false
