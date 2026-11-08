@@ -25,6 +25,16 @@
 | `Sources/ChapterListView.swift` / `ReaderView.swift` / `ReaderSettingsView.swift` | 目录、阅读页、阅读设置 |
 | `Tests/` | 逻辑测试:解析、存储、进度、样式 |
 
+## 在 iPad 上用 Swift Playgrounds 运行
+
+没有 Mac 时,可以在 iPad 上直接运行(需要 iPadOS 17+ 和免费的 Swift Playgrounds):
+
+1. 用 Safari 下载 `NovelReader.swiftpm.zip`
+2. 在"文件"里点压缩包解压,得到 `NovelReader.swiftpm`
+3. 点开它,用 Swift Playgrounds 打开,点运行(▶)
+
+`NovelReader.swiftpm` 的代码由 `scripts/sync-playground.py` 从 `Sources/` 同步生成,改了 `Sources/` 之后重新运行 `python3 scripts/sync-playground.py`,不要手改包里的文件。
+
 ## 开发方式
 
 按 ios-ci-workflows Skill 工作流开发:改代码 → push → 看 Build & Test 报告 → 继续迭代。
