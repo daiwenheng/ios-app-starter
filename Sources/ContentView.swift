@@ -1,87 +1,121 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
+/// 书架:列出所有书,支持导入 txt、滑动删除。
 struct ContentView: View {
-    @State private var selectedBook: Book? = nil
-    
-    private let books: [Book] = [
-        Book(
-            title: "情满四合院",
-            author: "刘和平",
-            chapters: [
-                Chapter(title: "第一章 回家", content: "天下雪。\n\n周秉昆站在院门口，望着风雪中走来的人影。"),
-                Chapter(title: "第二章 院里的事", content: "四合院里住着很多人。\n\n每一家都有自己的故事。")
-            ]
-        ),
-        Book(
-            title: "绿奴之路",
-            author: "网络小说",
-            chapters: [
-                Chapter(title: "开篇", content: "这是一个关于成长的故事。\n\n从这里开始阅读吧。")
-            ]
-        ),
-        Book(
-            title: "示例短篇",
-            author: "本地示例",
-            chapters: [
-                Chapter(title: "第一章", content: "这是一个用于演示的短篇小说。\n\n你可以在这里添加更多章节和内容。\n\n阅读界面支持上下滑动阅读。")
-            ]
-        )
-    ]
-    
+    @Environment(LibraryStore.self) private var library
+    @State private var showingImporter = false
+    @State private var isImporting = false
+    @State private var importMessage: String?
+
     var body: some View {
         NavigationStack {
-            List(books) { book in
-                NavigationLink(value: book) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(book.title)
-                            .font(.headline)
-                        Text(book.author)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+            Group {
+                if library.books.isEmpty {
+                    ContentUnavailableView {
+                        Label("书架是空的", systemImage: "books.vertical")
+                    } description: {
+                        Text("点右上角的 + 导入 txt 小说")
                     }
-                    .padding(.vertical, 4)
+                } else {
+                    bookList
                 }
             }
             .navigationTitle("小说阅读器")
-            .navigationDestination(for: Book.self) { book in
-                ChapterListView(book: book)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingImporter = true
+                    } label: {
+                        Label("导入小说", systemImage: "plus")
+                    }
+                    .accessibilityIdentifier("importButton")
+                }
+            }
+            .navigationDestination(for: UUID.self) { id in
+                if let book = library.book(id: id) {
+                    ChapterListView(book: book)
+                } else {
+                    ContentUnavailableView("这本书已被删除", systemImage: "book.closed")
+                }
+            }
+            .fileImporter(
+                isPresented: $showingImporter,
+                allowedContentTypes: [.plainText],
+                allowsMultipleSelection: true
+            ) { result in
+                handleImport(result)
+            }
+            .overlay {
+                if isImporting {
+                    ProgressView("正在导入…")
+                        .padding(24)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                }
+            }
+            .alert("导入结果", isPresented: alertBinding) {
+                Button("好", role: .cancel) {}
+            } message: {
+                Text(importMessage ?? "")
             }
         }
     }
-}
 
-struct ChapterListView: View {
-    let book: Book
-    
-    var body: some View {
-        List(book.chapters) { chapter in
-            NavigationLink(value: chapter) {
-                Text(chapter.title)
+    private var bookList: some View {
+        List {
+            ForEach(library.books) { book in
+                NavigationLink(value: book.id) {
+                    BookRow(book: book, progress: library.progress(for: book.id))
+                }
+            }
+            .onDelete { offsets in
+                library.remove(at: offsets)
             }
         }
-        .navigationTitle(book.title)
-        .navigationDestination(for: Chapter.self) { chapter in
-            ReaderView(chapter: chapter)
-        }
+        .accessibilityIdentifier("bookList")
     }
-}
 
-struct ReaderView: View {
-    let chapter: Chapter
-    
-    var body: some View {
-        ScrollView {
-            Text(chapter.content)
-                .font(.body)
-                .lineSpacing(8)
-                .padding()
-                .frame(maxWidth: .infinity, alignment: .leading)
+    private var alertBinding: Binding<Bool> {
+        Binding(
+            get: { importMessage != nil },
+            set: { isPresented in
+                if !isPresented { importMessage = nil }
+            }
+        )
+    }
+
+    private func handleImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            importMessage = error.localizedDescription
+        case .success(let urls):
+            guard !urls.isEmpty else { return }
+            isImporting = true
+            Task {
+                var imported = 0
+                var failures: [String] = []
+                for url in urls {
+                    do {
+                        let book = try await Task.detached(priority: .userInitiated) {
+                            try TextBookParser.importBook(from: url)
+                        }.value
+                        library.add(book)
+                        imported += 1
+                    } catch {
+                        failures.append("\(url.lastPathComponent):\(error.localizedDescription)")
+                    }
+                }
+                isImporting = false
+                var lines: [String] = []
+                if imported > 0 { lines.append("已导入 \(imported) 本书。") }
+                lines.append(contentsOf: failures)
+                importMessage = lines.joined(separator: "\n")
+            }
         }
-        .navigationTitle(chapter.title)
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 #Preview {
     ContentView()
+        .environment(LibraryStore(fileURL: nil, defaults: UserDefaults(suiteName: "preview") ?? .standard))
 }
