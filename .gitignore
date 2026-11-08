@@ -1,0 +1,13 @@
+# XcodeGen 在 CI 里生成工程文件,不提交
+*.xcodeproj
+
+# 构建与测试产物
+build/
+.build-test-derived-data/
+.ci-workflows/
+DerivedData/
+
+# Xcode / macOS
+xcuserdata/
+*.xcuserstate
+.DS_Store
