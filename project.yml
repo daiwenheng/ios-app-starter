@@ -26,6 +26,8 @@ targets:
         CURRENT_PROJECT_VERSION: 1
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: 小说阅读器
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     scheme:
       testTargets:
         - NovelReaderTests
