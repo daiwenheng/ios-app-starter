@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>阅书</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="阅书">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#EEF1F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1216" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="welcome">
+  <div class="welcome-glyph" aria-hidden="true">阅</div>
+  <div class="welcome-body">
+    <h1>阅书</h1>
+    <p>你自己的书房。<br>书都存在这台设备上,不用联网。</p>
+    <button id="enterBtn" class="welcome-btn">进入书房</button>
+  </div>
+</div>
+
+<main id="library" class="view"></main>
+<section id="reader" class="view" hidden></section>
+
+<div id="sheetRoot"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="txtInput" accept=".txt,text/plain" multiple hidden>
+<script src="app.js"></script>
+</body>
+</html>
