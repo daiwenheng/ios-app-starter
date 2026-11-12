@@ -36,7 +36,7 @@ struct ReaderView: View {
         }
         .navigationBarHidden(true)
         .onAppear(perform: loadInitial)
-        .onDisappear(perform: commitEdit)
+        .onDisappear { commitEdit() }
         .toastOverlay()
     }
 
