@@ -24,4 +24,21 @@ enum ReaderText {
         }
         return result
     }
+
+    /// 编辑模式里把正文显示成"段与段之间空一行"。
+    static func editableText(from content: String) -> String {
+        paragraphs(from: content).joined(separator: "\n\n")
+    }
+
+    /// 编辑完保存时,把输入框里的文字整理回"一行一段"的正文。
+    static func content(fromEditable text: String) -> String {
+        paragraphs(from: text).joined(separator: "\n")
+    }
+
+    /// 书签、笔记用的摘录:取前 `limit` 个字,超出加省略号。
+    static func excerpt(_ text: String, limit: Int = 40) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > limit else { return trimmed }
+        return String(trimmed.prefix(limit)) + "…"
+    }
 }

@@ -44,36 +44,68 @@ final class ReaderTests: XCTestCase {
         XCTAssertNil(ReadingProgress(chapterIndex: 0, paragraphIndex: 0).clamped(chapterCount: 0))
     }
 
-    // MARK: - 阅读样式
+    // MARK: - 阅读设置
 
-    func testFontSizeAndLineSpacingAreClamped() {
-        XCTAssertEqual(ReaderStyle.clampedFontSize(1), ReaderStyle.fontSizeRange.lowerBound)
-        XCTAssertEqual(ReaderStyle.clampedFontSize(999), ReaderStyle.fontSizeRange.upperBound)
-        XCTAssertEqual(ReaderStyle.clampedFontSize(20), 20)
-        XCTAssertEqual(ReaderStyle.clampedLineSpacing(-5), ReaderStyle.lineSpacingRange.lowerBound)
-        XCTAssertEqual(ReaderStyle.clampedLineSpacing(100), ReaderStyle.lineSpacingRange.upperBound)
+    func testSettingsAreClampedIntoRanges() {
+        var settings = ReaderSettings()
+        settings.fontSize = 1
+        settings.lineHeight = 99
+        settings.letterSpacing = -50
+        settings.paraGap = 99
+        settings.padX = -3
+        settings.padY = 500
+        let clamped = settings.clamped()
+        XCTAssertEqual(clamped.fontSize, ReaderSettings.fontSizeRange.lowerBound)
+        XCTAssertEqual(clamped.lineHeight, ReaderSettings.lineHeightRange.upperBound)
+        XCTAssertEqual(clamped.letterSpacing, ReaderSettings.letterSpacingRange.lowerBound)
+        XCTAssertEqual(clamped.paraGap, ReaderSettings.paraGapRange.upperBound)
+        XCTAssertEqual(clamped.padX, ReaderSettings.padXRange.lowerBound)
+        XCTAssertEqual(clamped.padY, ReaderSettings.padYRange.upperBound)
     }
 
     func testDefaultsAreInsideRanges() {
-        XCTAssertTrue(ReaderStyle.fontSizeRange.contains(ReaderStyle.defaultFontSize))
-        XCTAssertTrue(ReaderStyle.lineSpacingRange.contains(ReaderStyle.defaultLineSpacing))
+        let d = ReaderSettings()
+        XCTAssertTrue(ReaderSettings.fontSizeRange.contains(d.fontSize))
+        XCTAssertTrue(ReaderSettings.lineHeightRange.contains(d.lineHeight))
+        XCTAssertTrue(ReaderSettings.letterSpacingRange.contains(d.letterSpacing))
+        XCTAssertTrue(ReaderSettings.paraGapRange.contains(d.paraGap))
+        XCTAssertTrue(ReaderSettings.padXRange.contains(d.padX))
+        XCTAssertTrue(ReaderSettings.padYRange.contains(d.padY))
+        XCTAssertEqual(d.theme, .system)
     }
 
     func testThemesHaveUniqueIdsAndNames() {
-        let themes = ReaderTheme.allCases
+        let themes = ReaderThemeKind.allCases
         XCTAssertEqual(Set(themes.map(\.id)).count, themes.count)
         XCTAssertEqual(Set(themes.map(\.displayName)).count, themes.count)
     }
 
-    func testThemeColorSchemes() {
-        XCTAssertNil(ReaderTheme.system.colorScheme)
-        XCTAssertEqual(ReaderTheme.light.colorScheme, .light)
-        XCTAssertEqual(ReaderTheme.sepia.colorScheme, .light)
-        XCTAssertEqual(ReaderTheme.dark.colorScheme, .dark)
+    func testSettingsDecodeFillsMissingFieldsAndClamps() throws {
+        let json = #"{"fontSize": 500, "theme": "不存在"}"#
+        let decoded = try JSONDecoder().decode(ReaderSettings.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.fontSize, ReaderSettings.fontSizeRange.upperBound)
+        XCTAssertEqual(decoded.theme, .system)
+        XCTAssertEqual(decoded.lineHeight, ReaderSettings().lineHeight)
     }
 
-    func testUnknownStoredThemeFallsBackToSystem() {
-        XCTAssertEqual(ReaderTheme(rawValue: "不存在") ?? .system, .system)
-        XCTAssertEqual(ReaderTheme(rawValue: ReaderTheme.dark.rawValue), .dark)
+    @MainActor
+    func testSettingsStorePersistsChanges() {
+        let suite = "NovelReaderTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite) ?? .standard
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: suite) }
+        let store = ReaderSettingsStore(defaults: defaults)
+        store.update { $0.fontSize = 22; $0.theme = .night }
+        let reloaded = ReaderSettingsStore(defaults: defaults)
+        XCTAssertEqual(reloaded.settings.fontSize, 22)
+        XCTAssertEqual(reloaded.settings.theme, .night)
+        reloaded.reset()
+        XCTAssertEqual(ReaderSettingsStore(defaults: defaults).settings, ReaderSettings())
+    }
+
+    func testReaderPaletteFollowsSystemWhenThemeIsSystem() {
+        XCTAssertFalse(ReaderPalette.resolve(.system, systemIsDark: false).isDark)
+        XCTAssertTrue(ReaderPalette.resolve(.system, systemIsDark: true).isDark)
+        XCTAssertTrue(ReaderPalette.resolve(.night, systemIsDark: false).isDark)
+        XCTAssertFalse(ReaderPalette.resolve(.eyeCare, systemIsDark: true).isDark)
     }
 }

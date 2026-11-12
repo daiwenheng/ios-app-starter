@@ -22,7 +22,7 @@ enum TextBookParser {
     static let maxHeadingLength = 40
 
     private static let headingPattern =
-        #"^(第[0-9零〇一二三四五六七八九十百千万两]+[章节回卷集部篇]|(?i:chapter)\s*[0-9IVXivx]+|序章|楔子|引子|尾声|后记|番外)"#
+        #"^(第\s*[0-9零〇一二三四五六七八九十百千万两]+\s*[章节回卷集部篇]|(?i:chapter)\s*[0-9IVXivx]+|序章|楔子|引子|尾声|后记|番外)"#
 
     // MARK: - 导入
 
@@ -43,7 +43,7 @@ enum TextBookParser {
         let name = (fileName as NSString).deletingPathExtension
         return Book(
             title: name.isEmpty ? "未命名" : name,
-            author: "本地导入",
+            author: "导入作品",
             chapters: chapters
         )
     }
@@ -91,7 +91,7 @@ enum TextBookParser {
             let content = buffer.joined(separator: "\n")
             buffer.removeAll()
             guard !content.isEmpty else { return }
-            chapters.append(Chapter(title: currentTitle ?? "前言", content: content))
+            chapters.append(Chapter(title: currentTitle ?? "序章", content: content))
         }
 
         for line in text.components(separatedBy: "\n") {

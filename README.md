@@ -4,26 +4,28 @@
 
 ## 功能
 
-- **书架**:书保存在本机,支持滑动删除;第一次启动自带两本示例书(使用说明、示例短篇)
-- **导入 txt**:点右上角 + 从"文件"App 选择一个或多个 txt
-  - 自动识别 UTF-8、UTF-16、GBK/GB18030 编码
-  - 按"第X章/节/回……""Chapter N"等标题自动分章;没有标题时按字数切成若干部分
-- **目录**:每本书一个目录页,顶部"继续阅读"回到上次读到的章节和位置
-- **阅读页**:滚动阅读,上一章/下一章,自动记住阅读位置
-- **阅读设置**:字号、行距、主题(跟随系统 / 白天 / 护眼 / 夜间),所有书通用
+- **书架**:封面网格,最近读过的排最前,顶部"接着读"一键回到上次位置;支持搜索书名/作者;"管理"模式下可编辑信息、删除
+- **传 TXT**:从"文件"App 选一个或多个 txt;自动识别 UTF-8、UTF-16、GBK/GB18030,按"第X章/节/回""Chapter N"分章,没有标题时按字数切段;选一个文件时先确认书名、作者、封面
+- **写书**:从空白开始写一本书
+- **书籍信息**:书名、作者、简介、封面图片(自动缩小),没有封面时用按 id 固定配色的大字封面
+- **阅读页**:滚动阅读、记住位置;点屏幕呼出上下菜单;章末有上一章/下一章;可直接编辑正文
+- **书签与笔记**:阅读页右上角"…"在当前段落加书签或写笔记,在目录里查看、跳转、滑动删除
+- **目录**:搜索章节、正序/倒序、当前章高亮;编辑模式可插入、上移/下移、改名、删除、末尾添加章节
+- **阅读设置**:字号、加粗、行距、字距、段距、左右/上下边距、字体颜色、对话染色(“…”和「…」)及颜色、主题(跟随系统/默认/护眼/夜间)
+- **备份与恢复**:选书导出为文件或复制到剪贴板,从文件或剪贴板恢复(覆盖当前所有书);和网页版"阅书"的备份格式互通
 
 ## 代码结构
 
 | 文件 | 作用 |
 | --- | --- |
-| `Sources/Book.swift` | `Book` / `Chapter` 模型(可持久化) |
-| `Sources/TextBookParser.swift` | txt 解码与分章 |
-| `Sources/LibraryStore.swift` | 书架与阅读进度的存储 |
-| `Sources/ReadingProgress.swift` | 阅读进度、阅读页导航目标 |
-| `Sources/ReaderText.swift` / `ReaderStyle.swift` | 阅读页的分段、字号/主题等外观设置 |
-| `Sources/ContentView.swift` | 书架页(含导入) |
-| `Sources/ChapterListView.swift` / `ReaderView.swift` / `ReaderSettingsView.swift` | 目录、阅读页、阅读设置 |
-| `Tests/` | 逻辑测试:解析、存储、进度、样式 |
+| `Book.swift` / `Annotations.swift` / `BookEditing.swift` / `BookDraft.swift` | 书、章节、书签、笔记;目录编辑;书籍信息表单数据 |
+| `TextBookParser.swift` / `ReaderText.swift` / `DialogueHighlighter.swift` | txt 解码与分章、分段、对话切分 |
+| `LibraryStore.swift` / `ReadingProgress.swift` / `ReaderSettings.swift` | 书架与进度存储、阅读设置 |
+| `BackupCodec.swift` / `CoverImage.swift` / `ToastCenter.swift` | 备份编解码、封面处理、轻提示 |
+| `Theme.swift` | 配色、字体、封面、按钮样式 |
+| `WelcomeView` / `ContentView` / `BookFormView` / `BackupView` | 启动页、书架、书籍表单、备份页 |
+| `ReaderView` / `ChapterTextView` / `CatalogView` / `ReaderSettingsView` | 阅读页、正文排版、目录、阅读设置 |
+| `Tests/` | 逻辑测试:解析、存储、进度、设置、目录编辑、备份、对话染色 |
 
 ## 在 iPad 上用 Swift Playgrounds 运行
 
