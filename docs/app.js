@@ -16,6 +16,24 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
 }
 
+const ICON_PATHS = {
+  chevL: 'M15 18l-6-6 6-6', list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+  prev: 'M11 17l-5-5 5-5M18 17l-5-5 5-5', next: 'M13 17l5-5-5-5M6 17l5-5-5-5',
+  more: 'M5 12h.01M12 12h.01M19 12h.01', search: 'M11 4a7 7 0 100 14 7 7 0 000-14zM21 21l-4.3-4.3',
+  plus: 'M12 5v14M5 12h14', up: 'M12 19V5M5 12l7-7 7 7', down: 'M12 5v14M19 12l-7 7-7-7',
+  pencil: 'M17 3l4 4L8 20H4v-4L17 3z', x: 'M18 6L6 18M6 6l12 12', check: 'M20 6L9 17l-5-5',
+  bookmark: 'M6 3h12v18l-6-4-6 4V3z', note: 'M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z',
+  upload: 'M12 16V4M7 9l5-5 5 5M5 20h14', box: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
+  book: 'M4 19.5V5.5A2.5 2.5 0 016.5 3H20v14H6.5A2.5 2.5 0 004 19.5zM6.5 17H20v4H6.5A2.5 2.5 0 014 19.5',
+  arrow: 'M5 12h14M13 6l6 6-6 6',
+};
+const ic = (name, extra = '') => name === 'aa'
+  ? '<span class="i aa" style="font-weight:700;font-size:.78em;letter-spacing:-.02em">Aa</span>'
+  : `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" ${extra}><path d="${ICON_PATHS[name]}"/></svg>`;
+const chk = (on) => on
+  ? '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/><path d="M7.5 12.5l3 3 6-6.5" stroke="#fff" stroke-width="2.4"/></svg>'
+  : '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" stroke-width="1.6"/></svg>';
+
 function hueIndex(id) {
   let h = 0;
   for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
@@ -28,7 +46,7 @@ function glyphOf(title) {
 function coverHTML(book) {
   if (book.cover) return `<div class="cover"><img src="${book.cover}" alt="${esc(book.title)}"></div>`;
   return `<div class="cover h${hueIndex(book.id)}" role="img" aria-label="${esc(book.title)}">
-    <div class="au">${esc(book.author)}</div><div class="glyph">${esc(glyphOf(book.title))}</div></div>`;
+    <div class="glyph">${esc(glyphOf(book.title))}</div><div class="ct">${esc(book.title)}</div><div class="au">${esc(book.author)}</div></div>`;
 }
 
 // ───────── 存储 ─────────
@@ -178,7 +196,7 @@ const sheetRoot = $('sheetRoot');
 function openSheet(html, { tall = false, onClose } = {}) {
   const scrim = document.createElement('div');
   scrim.className = 'scrim';
-  scrim.innerHTML = `<div class="sheet${tall ? ' tall' : ''}" role="dialog" aria-modal="true">${html}</div>`;
+  scrim.innerHTML = `<div class="sheet${tall ? ' tall' : ''}" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
   const close = () => { scrim.remove(); onClose?.(); };
   scrim.addEventListener('click', (e) => { if (e.target === scrim) close(); });
   sheetRoot.appendChild(scrim);
@@ -194,7 +212,7 @@ function dialog(html) {
 }
 function confirmDialog(title, message, okText, onOk, danger = true) {
   const d = dialog(`<h3>${esc(title)}</h3><p>${esc(message)}</p>
-    <div class="row"><button class="btn" data-x="no">取消</button>
+    <div class="row"><button class="btn plain" data-x="no">取消</button>
     <button class="btn ${danger ? 'danger' : 'solid'}" data-x="ok">${esc(okText)}</button></div>`);
   d.el.addEventListener('click', (e) => {
     const x = e.target.closest('[data-x]')?.dataset.x;
@@ -207,7 +225,7 @@ function promptDialog(title, value, onOk, { multiline = false, placeholder = '' 
   const d = dialog(`<h3>${esc(title)}</h3>
     ${multiline ? `<textarea class="field" placeholder="${esc(placeholder)}">${esc(value)}</textarea>`
       : `<input class="field" value="${esc(value)}" placeholder="${esc(placeholder)}">`}
-    <div class="row"><button class="btn" data-x="no">取消</button><button class="btn solid" data-x="ok">确定</button></div>`);
+    <div class="row"><button class="btn plain" data-x="no">取消</button><button class="btn solid" data-x="ok">确定</button></div>`);
   const input = d.el.querySelector('.field');
   setTimeout(() => input.focus(), 50);
   d.el.addEventListener('click', (e) => {
@@ -241,31 +259,30 @@ function renderLibrary() {
   let banner = '';
   if (!query && recent) {
     const c = Math.min(progress[recent.id].c || 0, recent.chapters.length - 1);
-    banner = `<button class="banner h${hueIndex(recent.id)}" style="background:var(--hue)" data-open="${recent.id}">
-      <div><small>接着读</small><strong>${esc(recent.title)}</strong><span>${esc(recent.chapters[c].title)}</span></div><div class="go">→</div></button>`;
+    banner = `<button class="resume" data-open="${recent.id}">${coverHTML(recent)}
+      <div class="rt"><small>接着读</small><strong>${esc(recent.title)}</strong><span class="ch">${esc(recent.chapters[c].title)}</span>
+      <div class="bar"><i style="width:${percentOf(recent) || 0}%"></i></div></div><span class="btn solid go">继续</span></button>`;
   }
   let body;
-  if (!library.length) body = `<div class="empty"><b>书架是空的</b><span>点“传 TXT”导入一本小说,或者点“写书”从空白开始。</span></div>`;
-  else if (!list.length) body = `<div class="empty"><b>没有找到</b><span>换个书名或作者再搜一次。</span></div>`;
+  if (!library.length) body = `<div class="empty"><div class="ei">${ic('book')}</div><b>书架是空的</b><span>点“传 TXT”导入一本小说,<br>或者点“写书”从空白开始。</span></div>`;
+  else if (!list.length) body = `<div class="empty"><div class="ei">${ic('search')}</div><b>没有找到</b><span>换个书名或作者再搜一次。</span></div>`;
   else {
     body = `<div class="grid">${list.map((b) => {
       const pct = percentOf(b);
       return `<div class="cell"><div class="cell-cover" data-open="${b.id}">${coverHTML(b)}
-        ${manage ? `<div class="badges"><button class="badge" data-edit="${b.id}" aria-label="编辑">✎</button><button class="badge del" data-del="${b.id}" aria-label="删除">✕</button></div>` : ''}</div>
+        ${manage ? `<div class="badges"><button class="badge" data-edit="${b.id}" aria-label="编辑">${ic('pencil')}</button><button class="badge del" data-del="${b.id}" aria-label="删除">${ic('x')}</button></div>` : ''}</div>
         <h3>${esc(b.title)}</h3><p>${esc(b.author)}</p>${pct !== null ? `<p class="pct">已读 ${pct}%</p>` : ''}</div>`;
     }).join('')}</div>`;
   }
   $('library').innerHTML = `
-    <h1 class="lib-title">书架</h1>
-    <div class="lib-count">${library.length} 本书</div>
+    <div class="lib-head"><div><h1 class="lib-title">书架</h1><div class="lib-count">${library.length} 本书</div></div>
+      <button class="btn ${manage ? 'on' : 'plain'}" id="btnManage">${manage ? '完成' : '管理'}</button></div>
     <div class="lib-actions">
-      <button class="btn solid" id="btnImport">传 TXT</button>
-      <button class="btn" id="btnWrite">写书</button>
-      <button class="btn" id="btnBackup">备份</button>
-      <span class="spacer"></span>
-      <button class="btn ${manage ? 'on' : ''}" id="btnManage">${manage ? '完成' : '管理'}</button>
+      <button class="btn solid" id="btnImport">${ic('upload')} 传 TXT</button>
+      <button class="btn" id="btnWrite">${ic('pencil')} 写书</button>
+      <button class="btn" id="btnBackup">${ic('box')} 备份</button>
     </div>
-    <label class="search"><span class="muted">⌕</span><input id="searchInput" type="search" placeholder="搜索书名或作者" value="${esc(query)}"></label>
+    <label class="search">${ic('search')}<input id="searchInput" type="search" placeholder="搜索书名或作者" value="${esc(query)}"></label>
     ${banner}${body}`;
 }
 $('library').addEventListener('click', (e) => {
@@ -389,16 +406,16 @@ function openBook(id, chapterIndex, block) {
     <div id="scroller"><article id="article"></article></div>
     <textarea id="editor" hidden spellcheck="false"></textarea>
     <header class="rbar top" id="topBar">
-      <button class="ic" data-r="back" aria-label="返回书架">‹</button>
+      <button class="ic" data-r="back" aria-label="返回书架">${ic('chevL')}</button>
       <div class="ttlbox"><b id="rbTitle"></b><small id="rbIdx"></small></div>
       <button class="tx" data-r="edit" id="editBtn">编辑</button>
-      <button class="ic" data-r="more" aria-label="更多">⋯</button>
+      <button class="ic" data-r="more" aria-label="更多">${ic('more', 'style="stroke-width:3.4"')}</button>
     </header>
     <nav class="rbar bottom" id="botBar">
-      <button data-r="prev" id="bPrev"><i>«</i>上一章</button>
-      <button data-r="catalog"><i>☰</i>目录</button>
-      <button data-r="settings"><i>Aa</i>设置</button>
-      <button data-r="next" id="bNext"><i>»</i>下一章</button>
+      <button data-r="prev" id="bPrev">${ic('prev')}上一章</button>
+      <button data-r="catalog">${ic('list')}目录</button>
+      <button data-r="settings">${ic('aa')}设置</button>
+      <button data-r="next" id="bNext">${ic('next')}下一章</button>
     </nav>`;
   barsHidden = false; editing = false;
   applySettings();
@@ -478,7 +495,7 @@ function showMoreMenu() {
   if ($('readerMenu')) return $('readerMenu').remove();
   const m = document.createElement('div');
   m.className = 'menu'; m.id = 'readerMenu';
-  m.innerHTML = `<button data-r="addbm">🔖 在这里加书签</button><button data-r="addnote">✎ 在这里写笔记</button>`;
+  m.innerHTML = `<button data-r="addbm">在这里加书签${ic('bookmark')}</button><button data-r="addnote">在这里写笔记${ic('note')}</button>`;
   $('reader').appendChild(m);
 }
 function blockInfo(b) {
@@ -558,22 +575,22 @@ function openCatalog() {
       let idx = book.chapters.map((_, i) => i);
       if (!asc) idx.reverse();
       if (q.trim()) idx = idx.filter((i) => book.chapters[i].title.toLowerCase().includes(q.trim().toLowerCase()));
-      body = `<div class="tools"><input class="field" id="catQ" type="search" placeholder="搜索章节" value="${esc(q)}"><button class="btn" data-x="sort">${asc ? '正序' : '倒序'}</button></div>
+      body = `<div class="tools"><input class="field" id="catQ" type="search" placeholder="搜索章节" value="${esc(q)}"><button class="btn plain" data-x="sort">${asc ? '正序' : '倒序'}</button></div>
         <div class="list">${idx.length ? idx.map((i) => `
           <div class="item ${i === ci ? 'cur' : ''}"><button class="main" data-jump="${i}"><div class="t">${esc(book.chapters[i].title)}</div></button>
-          ${i === ci && !catEdit ? '<span class="ch">✓</span>' : ''}
-          ${catEdit ? `<div class="ops"><button class="op add" data-op="ins" data-i="${i}" aria-label="在后面插入新章">+</button>
-            <button class="op" data-op="up" data-i="${i}" aria-label="上移">↑</button><button class="op" data-op="down" data-i="${i}" aria-label="下移">↓</button>
-            <button class="op" data-op="ren" data-i="${i}" aria-label="改名">✎</button><button class="op del" data-op="del" data-i="${i}" aria-label="删除">✕</button></div>` : ''}</div>`).join('')
+          ${i === ci && !catEdit ? `<span class="ch">${ic('check')}</span>` : ''}
+          ${catEdit ? `<div class="ops"><button class="op add" data-op="ins" data-i="${i}" aria-label="在后面插入新章">${ic('plus')}</button>
+            <button class="op" data-op="up" data-i="${i}" aria-label="上移">${ic('up')}</button><button class="op" data-op="down" data-i="${i}" aria-label="下移">${ic('down')}</button>
+            <button class="op" data-op="ren" data-i="${i}" aria-label="改名">${ic('pencil')}</button><button class="op del" data-op="del" data-i="${i}" aria-label="删除">${ic('x')}</button></div>` : ''}</div>`).join('')
           : '<div class="item muted">没有找到匹配的章节</div>'}</div>
-        ${catEdit ? '<button class="row-btn" data-op="add">+ 添加新章节到末尾</button>' : ''}`;
+        ${catEdit ? `<button class="row-btn" data-op="add">${ic('plus')} 添加新章节到末尾</button>` : ''}`;
     } else if (tab === 'bookmarks') {
       const items = [...book.bookmarks].sort((a, b) => b.createdAt - a.createdAt);
       body = items.length ? `<div class="list">${items.map((m) => {
         const c = book.chapters.findIndex((x) => x.id === m.chapterID);
         return c < 0 ? '' : `<div class="item"><button class="main" data-jump="${c}" data-block="${m.blockIndex}">
           <div class="ch">${esc(book.chapters[c].title)}</div><div class="q" style="font-size:15px;color:var(--ink)">${esc(m.excerpt)}</div></button>
-          <button class="op del" data-rmbm="${m.id}" aria-label="删除书签">✕</button></div>`;
+          <button class="op del" data-rmbm="${m.id}" aria-label="删除书签">${ic('x')}</button></div>`;
       }).join('')}</div>` : '<p class="muted">还没有书签。在阅读页点右上角“⋯”,选“在这里加书签”。</p>';
     } else {
       const items = [...book.notes].sort((a, b) => b.createdAt - a.createdAt);
@@ -581,7 +598,7 @@ function openCatalog() {
         const c = book.chapters.findIndex((x) => x.id === n.chapterID);
         return c < 0 ? '' : `<div class="item"><button class="main" data-jump="${c}" data-block="${n.blockIndex}">
           <div class="ch">${esc(book.chapters[c].title)}</div><div>${esc(n.text)}</div>${n.quote ? `<div class="q">${esc(n.quote)}</div>` : ''}</button>
-          <button class="op del" data-rmnote="${n.id}" aria-label="删除笔记">✕</button></div>`;
+          <button class="op del" data-rmnote="${n.id}" aria-label="删除笔记">${ic('x')}</button></div>`;
       }).join('')}</div>` : '<p class="muted">还没有笔记。在阅读页点右上角“⋯”,选“在这里写笔记”。</p>';
     }
     const keepQ = document.activeElement?.id === 'catQ';
@@ -733,8 +750,8 @@ function openBackup() {
   const draw = () => {
     s.el.innerHTML = `<div class="sheet-head"><span></span><h2>备份与恢复</h2><button data-x="close">完成</button></div>
       <div class="sheet-body">
-        <div class="group"><h4>选择要备份的书(已选 ${selected.size} 本) <button data-x="all" style="color:var(--accent);margin-left:8px">全选</button><button data-x="none" style="color:var(--accent);margin-left:8px">全不选</button></h4>
-          <div class="list">${library.map((b) => `<button class="item" data-sel="${b.id}"><span class="chk ${selected.has(b.id) ? 'on' : ''}">${selected.has(b.id) ? '☑' : '☐'}</span>
+        <div class="group"><h4>选择要备份的书(已选 ${selected.size} 本) <button data-x="all" class="link">全选</button><button data-x="none" class="link">全不选</button></h4>
+          <div class="list">${library.map((b) => `<button class="item" data-sel="${b.id}"><span class="chk ${selected.has(b.id) ? 'on' : ''}">${chk(selected.has(b.id))}</span>
             <span class="main"><div class="t">${esc(b.title)}</div><div class="s">${esc(b.author)} · ${b.chapters.length} 章</div></span></button>`).join('') || '<div class="item muted">书架是空的</div>'}</div></div>
         <div class="group"><h4>备份</h4><div class="list">
           <button class="item" data-x="export"><span class="main t">导出为文件</span></button>

@@ -1,5 +1,5 @@
 // 离线缓存:第一次打开后,没有网络也能用。改了文件就把 VERSION 加一。
-const VERSION = 'yueshu-v1';
+const VERSION = 'yueshu-v2';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
