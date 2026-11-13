@@ -25,7 +25,7 @@ const ICON_PATHS = {
   bookmark: 'M6 3h12v18l-6-4-6 4V3z', note: 'M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z',
   upload: 'M12 16V4M7 9l5-5 5 5M5 20h14', box: 'M3 4h18v4H3zM5 8v12h14V8M10 12h4',
   book: 'M4 19.5V5.5A2.5 2.5 0 016.5 3H20v14H6.5A2.5 2.5 0 004 19.5zM6.5 17H20v4H6.5A2.5 2.5 0 014 19.5',
-  arrow: 'M5 12h14M13 6l6 6-6 6',
+  arrow: 'M5 12h14M13 6l6 6-6 6', cloud: 'M18 10a6 6 0 00-11.5-1.5A4.5 4.5 0 007 18h11a4 4 0 000-8z',
 };
 const ic = (name, extra = '') => name === 'aa'
   ? '<span class="i aa" style="font-weight:700;font-size:.78em;letter-spacing:-.02em">Aa</span>'
@@ -281,6 +281,7 @@ function renderLibrary() {
       <button class="btn solid" id="btnImport">${ic('upload')} 传 TXT</button>
       <button class="btn" id="btnWrite">${ic('pencil')} 写书</button>
       <button class="btn" id="btnBackup">${ic('box')} 备份</button>
+      <button class="btn" id="btnCloud">${ic('cloud')} 书库</button>
     </div>
     <label class="search">${ic('search')}<input id="searchInput" type="search" placeholder="搜索书名或作者" value="${esc(query)}"></label>
     ${banner}${body}`;
@@ -300,6 +301,7 @@ $('library').addEventListener('click', (e) => {
   if (t.closest('#btnImport')) return $('txtInput').click();
   if (t.closest('#btnWrite')) return openBookForm({ draft: { chapters: [{ id: uid(), title: '第一章', content: '' }] } });
   if (t.closest('#btnBackup')) return openBackup();
+  if (t.closest('#btnCloud')) return openCloud();
   if (t.closest('#btnManage')) { manage = !manage; renderLibrary(); }
 });
 $('library').addEventListener('input', (e) => {
@@ -810,6 +812,155 @@ function openBackup() {
       } catch {
         promptDialog('粘贴备份内容', '', (v) => { if (!v.trim()) { toast('请先粘贴内容'); return false; } ask(v); }, { multiline: true, placeholder: '把备份内容粘贴到这里' });
       }
+    }
+  });
+}
+
+// ───────── 云书库:管理员上传,所有人可读 ─────────
+const CLOUD = window.YUESHU_CLOUD || {};
+const cloudReady = () => Boolean(CLOUD.url && CLOUD.anonKey);
+const adminKey = 'yueshu.admin.v1';
+let admin = null; // { access, refresh, email }
+try { admin = JSON.parse(localStorage.getItem(adminKey) || 'null'); } catch { admin = null; }
+function saveAdmin(v) {
+  admin = v;
+  try { v ? localStorage.setItem(adminKey, JSON.stringify(v)) : localStorage.removeItem(adminKey); } catch { /* 忽略 */ }
+}
+async function cloudFetch(path, { method = 'GET', body, headers = {}, auth = false, retry = true } = {}) {
+  const token = auth && admin ? admin.access : CLOUD.anonKey;
+  const res = await fetch(CLOUD.url.replace(/\/$/, '') + path, {
+    method, body: body === undefined ? undefined : JSON.stringify(body),
+    headers: { apikey: CLOUD.anonKey, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', ...headers },
+  });
+  if (res.status === 401 && auth && admin?.refresh && retry) {
+    const r = await fetch(CLOUD.url.replace(/\/$/, '') + '/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST', headers: { apikey: CLOUD.anonKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: admin.refresh }),
+    });
+    if (r.ok) {
+      const j = await r.json();
+      saveAdmin({ ...admin, access: j.access_token, refresh: j.refresh_token });
+      return cloudFetch(path, { method, body, headers, auth, retry: false });
+    }
+    saveAdmin(null);
+    throw new Error('登录已过期,请重新登录');
+  }
+  if (!res.ok) {
+    let msg = '';
+    try { msg = (await res.json()).message || ''; } catch { /* 无内容 */ }
+    throw new Error(msg || `请求失败(${res.status})`);
+  }
+  return res.status === 204 ? null : res.json().catch(() => null);
+}
+async function cloudLogin(email, password) {
+  const res = await fetch(CLOUD.url.replace(/\/$/, '') + '/auth/v1/token?grant_type=password', {
+    method: 'POST', headers: { apikey: CLOUD.anonKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error_description || j.msg || '邮箱或密码不对');
+  saveAdmin({ access: j.access_token, refresh: j.refresh_token, email });
+}
+const cloudList = () => cloudFetch('/rest/v1/books?select=id,title,author,descr,cover,chapter_count,created_at,updated_at&order=updated_at.desc');
+const cloudGet = async (id) => (await cloudFetch(`/rest/v1/books?id=eq.${encodeURIComponent(id)}&select=*`))?.[0];
+const cloudDelete = (id) => cloudFetch(`/rest/v1/books?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE', auth: true });
+function cloudUpload(b) {
+  return cloudFetch('/rest/v1/books', {
+    method: 'POST', auth: true, headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: { id: b.id, title: b.title, author: b.author, descr: b.desc, cover: b.cover,
+      chapters: b.chapters.map((c) => ({ id: c.id, title: c.title, content: c.content })),
+      chapter_count: b.chapters.length, created_at: b.createTime, updated_at: new Date().toISOString() },
+  });
+}
+
+function openCloud() {
+  const s = openSheet('', { tall: true });
+  let remote = null, error = '', busy = false;
+  const draw = () => {
+    if (!cloudReady()) {
+      s.el.innerHTML = `<div class="sheet-head"><span></span><h2>书库</h2><button data-x="close">完成</button></div>
+        <div class="sheet-body"><div class="empty"><div class="ei">${ic('cloud')}</div><b>还没有设置云书库</b>
+        <span>照着仓库里的“云书库设置.md”做一遍,<br>再把地址和钥匙填进 config.js。</span></div></div>`;
+      return;
+    }
+    const mine = new Map(library.map((b) => [b.id, b]));
+    let body;
+    if (error) body = `<div class="empty"><div class="ei">${ic('cloud')}</div><b>连不上书库</b><span>${esc(error)}</span><br><br><button class="btn" data-x="reload">重试</button></div>`;
+    else if (!remote) body = '<div class="empty"><span>正在加载…</span></div>';
+    else if (!remote.length) body = `<div class="empty"><div class="ei">${ic('book')}</div><b>书库还没有书</b><span>${admin ? '在下面选一本书上传。' : '管理员上传以后会显示在这里。'}</span></div>`;
+    else body = `<div class="group"><h4>书库里的书(${remote.length})</h4><div class="list">${remote.map((r) => `
+      <div class="item"><div style="width:44px;flex:none">${coverHTML({ id: r.id, title: r.title, author: r.author || '', cover: r.cover })}</div>
+        <div class="main"><div class="t">${esc(r.title)}</div><div class="s">${esc(r.author || '')} · ${r.chapter_count} 章</div></div>
+        <button class="btn ${mine.has(r.id) ? 'plain' : 'solid'}" data-get="${esc(r.id)}" ${busy ? 'disabled' : ''}>${mine.has(r.id) ? '更新' : '加入书架'}</button>
+        ${admin ? `<button class="op del" data-rm="${esc(r.id)}" aria-label="从书库删除">${ic('x')}</button>` : ''}</div>`).join('')}</div></div>`;
+    let adminPart = '';
+    if (admin) {
+      adminPart = `<div class="group"><h4>上传本地的书到书库(管理员:${esc(admin.email)})</h4><div class="list">${library.map((b) => `
+        <div class="item"><div class="main"><div class="t">${esc(b.title)}</div><div class="s">${esc(b.author)} · ${b.chapters.length} 章</div></div>
+        <button class="btn" data-up="${esc(b.id)}" ${busy ? 'disabled' : ''}>${remote?.some((r) => r.id === b.id) ? '更新到书库' : '上传'}</button></div>`).join('') || '<div class="item muted">本地书架是空的</div>'}</div></div>`;
+    }
+    s.el.innerHTML = `<div class="sheet-head"><button data-x="${admin ? 'logout' : 'login'}">${admin ? '退出管理' : '管理员'}</button><h2>书库</h2><button data-x="close">完成</button></div>
+      <div class="sheet-body">${body}${adminPart}</div>`;
+  };
+  const load = async () => {
+    if (!cloudReady()) return;
+    error = ''; remote = null; draw();
+    try { remote = await cloudList(); } catch (err) { error = err.message === 'Failed to fetch' ? '请检查网络' : err.message; }
+    draw();
+  };
+  draw(); load();
+  s.el.addEventListener('click', async (e) => {
+    const t = e.target;
+    const x = t.closest('[data-x]')?.dataset.x;
+    if (x === 'close') return s.close();
+    if (x === 'reload') return load();
+    if (x === 'logout') { saveAdmin(null); toast('已退出管理'); return draw(); }
+    if (x === 'login') {
+      const d = dialog(`<h3>管理员登录</h3><p>只有管理员能上传和删除。</p>
+        <input class="field" id="adEmail" type="email" placeholder="邮箱" value="${esc(localStorage.getItem('yueshu.admin.email') || '')}" autocomplete="username">
+        <input class="field" id="adPass" type="password" placeholder="密码" autocomplete="current-password">
+        <div class="row"><button class="btn plain" data-y="no">取消</button><button class="btn solid" data-y="ok">登录</button></div>`);
+      d.el.addEventListener('click', async (ev) => {
+        const y = ev.target.closest('[data-y]')?.dataset.y;
+        if (y === 'no') return d.close();
+        if (y !== 'ok') return;
+        const email = d.el.querySelector('#adEmail').value.trim(), pass = d.el.querySelector('#adPass').value;
+        if (!email || !pass) return toast('请填写邮箱和密码');
+        try { await cloudLogin(email, pass); try { localStorage.setItem('yueshu.admin.email', email); } catch { /* 忽略 */ } d.close(); toast('登录成功'); draw(); }
+        catch (err) { toast(err.message); }
+      });
+      return;
+    }
+    const get = t.closest('[data-get]');
+    if (get) {
+      busy = true; draw(); toast('正在下载…');
+      try {
+        const r = await cloudGet(get.dataset.get);
+        if (!r) throw new Error('书库里已经没有这本书了');
+        const chapters = (r.chapters || []).map((c) => ({ id: c.id || uid(), title: c.title || '未命名章节', content: c.content || '' }));
+        if (!chapters.length) throw new Error('这本书没有内容');
+        const ids = new Set(chapters.map((c) => c.id));
+        const old = bookById(r.id);
+        const book = { id: r.id, title: r.title, author: r.author || '佚名', desc: r.descr || '', cover: r.cover || null, chapters,
+          createTime: old?.createTime || Date.now(),
+          bookmarks: (old?.bookmarks || []).filter((m) => ids.has(m.chapterID)), notes: (old?.notes || []).filter((m) => ids.has(m.chapterID)) };
+        await dbPut(book);
+        library = old ? library.map((b) => (b.id === book.id ? book : b)) : [...library, book];
+        renderLibrary(); toast(old ? '已更新' : '已加入书架');
+      } catch (err) { toast(err.message); }
+      busy = false; draw(); return;
+    }
+    const up = t.closest('[data-up]');
+    if (up) {
+      const b = bookById(up.dataset.up);
+      busy = true; draw(); toast('正在上传…');
+      try { await cloudUpload(b); remote = await cloudList(); toast('已上传到书库'); } catch (err) { toast(err.message); }
+      busy = false; draw(); return;
+    }
+    const rm = t.closest('[data-rm]');
+    if (rm) {
+      const r = remote.find((x2) => x2.id === rm.dataset.rm);
+      confirmDialog('从书库删除?', `《${r.title}》会从书库里消失,别人就看不到了(你自己书架上的不受影响)。`, '删除', async () => {
+        try { await cloudDelete(r.id); remote = remote.filter((x2) => x2.id !== r.id); toast('已从书库删除'); draw(); } catch (err) { toast(err.message); }
+      });
     }
   });
 }

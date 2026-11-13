@@ -1,6 +1,6 @@
 // 离线缓存:第一次打开后,没有网络也能用。改了文件就把 VERSION 加一。
-const VERSION = 'yueshu-v2';
-const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
+const VERSION = 'yueshu-v3';
+const FILES = ['./', 'index.html', 'style.css', 'app.js', 'config.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
@@ -14,7 +14,7 @@ self.addEventListener('activate', (e) => {
   );
 });
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
     caches.match(e.request).then((hit) => hit || fetch(e.request).catch(() => caches.match('index.html')))
   );
